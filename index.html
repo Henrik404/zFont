@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>zFont</title>
+  <!-- Tailwind CSS -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <!-- PWA manifest and theme color -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="img/icon-192.png">
+  <meta name="theme-color" content="#FFFFFF">
+  <style>
+    .drop-zone {
+      border: 2px dashed #cbd5e0;
+      transition: all 0.3s ease;
+    }
+    .drop-zone.dragover {
+      border-color: #4299e1;
+      background-color: #ebf8ff;
+    }
+    .progress-bar {
+      transition: width 0.3s ease;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    .pulse-animation {
+      animation: pulse 2s infinite;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div class="container mx-auto px-4 py-8 max-w-2xl">
+    <div class="bg-white rounded-lg shadow-xl p-6 space-y-6">
+      <!-- Title -->
+      <div class="text-center">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">zFont</h1>
+        <p class="text-gray-600">Convert font files into installable profiles (.mobileconfig) for Apple devices</p>
+      </div>
+      
+      <!-- Drop zone -->
+      <div id="dropZone" class="drop-zone rounded-lg p-8 text-center cursor-pointer hover:bg-gray-50">
+        <div class="space-y-4">
+          <div class="text-gray-600">
+            <span class="font-medium">Click to upload</span> or drag and drop files here
+            <p class="text-sm text-gray-500 mt-1">Supports .ttf or .otf formats (multiple files allowed)</p>
+          </div>
+        </div>
+        <input type="file" id="fontInput" accept=".ttf,.otf" class="hidden" multiple>
+      </div>
+
+      <!-- File info -->
+      <div id="fileInfo" class="hidden">
+        <div class="bg-blue-50 rounded-lg p-4">
+          <div class="text-blue-700 font-medium">
+            <ul id="fileList" class="list-disc list-inside"></ul>
+          </div>
+          <div class="mt-2">
+            <div class="w-full bg-blue-200 rounded-full h-2">
+              <div id="progressBar" class="progress-bar bg-blue-500 rounded-full h-2 w-0"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom profile name and description -->
+      <div class="space-y-4">
+        <label for="configName" class="block text-gray-700">Profile Name</label>
+        <input type="text" id="configName" placeholder="Enter profile name" class="w-full border rounded-lg p-2" value="">
+      </div>
+      <div class="space-y-4">
+        <label for="configDescription" class="block text-gray-700">Profile Description</label>
+        <input type="text" id="configDescription" placeholder="Enter profile description" class="w-full border rounded-lg p-2" value="">
+      </div>
+
+      <!-- Action buttons -->
+      <div class="space-y-4">
+        <button onclick="generateMobileConfig()" id="generateBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center space-x-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span>Generate Profile</span>
+        </button>
+        <a id="downloadLink" class="hidden w-full bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center space-x-2 pulse-animation">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span>Download Profile</span>
+        </a>
+      </div>
+
+      <!-- Instructions -->
+      <div class="mt-8 border-t pt-6">
+        <h2 class="text-lg font-semibold text-gray-700 mb-4">Instructions</h2>
+        <ol class="list-decimal list-inside space-y-2 text-gray-600">
+          <li>Upload one or more TrueType (.ttf) or OpenType (.otf) font files, with a total size limit of up to 20MB, ensuring that the fonts are properly optimized for the intended use and are legally permissible for distribution.</li>
+          <li>Provide a detailed profile name and description, ensuring clarity regarding the purpose, intended audience, and any specific attributes or limitations of the fonts being included in the profile.</li>
+          <li>Click the "Generate Profile" button to initiate the creation of the font profile. This action will compile the selected fonts, metadata, and settings into a cohesive profile ready for installation.</li>
+          <li>Download and install the generated profile on a compatible iOS or iPadOS device. Upon installation, the fonts will be available for use in compatible applications, ensuring seamless integration across various platforms and environments.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Functions for generating random strings and UUIDs
+    function generateRandomString(length) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      return Array.from({ length }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
+    }
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0,
+              v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    // UI elements
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fontInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileList = document.getElementById('fileList');
+    const progressBar = document.getElementById('progressBar');
+    const generateBtn = document.getElementById('generateBtn');
+    const downloadLink = document.getElementById('downloadLink');
+
+    // Drag and drop events
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const files = e.dataTransfer.files;
+      if (files.length) {
+        fileInput.files = files;
+        updateFileInfo();
+      }
+    });
+    fileInput.addEventListener('change', updateFileInfo);
+
+    function updateFileInfo() {
+      if (fileInput.files.length) {
+        fileList.innerHTML = '';
+        Array.from(fileInput.files).forEach(file => {
+          const li = document.createElement('li');
+          li.textContent = file.name;
+          fileList.appendChild(li);
+        });
+        fileInfo.classList.remove('hidden');
+        generateBtn.disabled = false;
+        progressBar.style.width = '0%';
+      }
+    }
+
+    // Read single font file, returns Promise
+    function readFontFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const progress = (event.loaded / event.total) * 100;
+            progressBar.style.width = progress + '%';
+          }
+        };
+        reader.onload = function(event) {
+          // Get base64 font data (remove "data:..." prefix)
+          const base64Font = event.target.result.split(',')[1];
+          resolve({ fileName: file.name, base64Font });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Generate profile with multiple font payloads
+    function generateMobileConfig() {
+      if (fileInput.files.length === 0) {
+        alert("Please select font files (.ttf or .otf)");
+        return;
+      }
+      const files = Array.from(fileInput.files);
+      Promise.all(files.map(readFontFile))
+        .then(results => {
+          // Generate individual payload for each font
+          let payloads = results.map(result => {
+            const fontId = generateRandomString(10);
+            const fontUUID = generateUUID();
+            return `
+      <dict>
+        <key>PayloadType</key>
+        <string>com.apple.font</string>
+        <key>PayloadVersion</key>
+        <integer>1</integer>
+        <key>PayloadIdentifier</key>
+        <string>com.fontconfig.font.${fontId}</string>
+        <key>PayloadUUID</key>
+        <string>${fontUUID}</string>
+        <key>PayloadDisplayName</key>
+        <string>${result.fileName}</string>
+        <key>PayloadDescription</key>
+        <string>Install ${result.fileName} font</string>
+        <key>FontName</key>
+        <string>${result.fileName}</string>
+        <key>Font</key>
+        <data>${result.base64Font}</data>
+      </dict>`;
+          }).join('\n');
+
+          // Main profile data (user customizable name and description)
+          const configId = generateRandomString(10);
+          const profileUUID = generateUUID();
+          const configName = document.getElementById('configName').value || 'Font Profile';
+          const configDescription = document.getElementById('configDescription').value || 'Install Fonts';
+
+          const mobileConfig = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>PayloadContent</key>
+    <array>
+      ${payloads}
+    </array>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+    <key>PayloadIdentifier</key>
+    <string>com.fontconfig.${configId}</string>
+    <key>PayloadUUID</key>
+    <string>${profileUUID}</string>
+    <key>PayloadDisplayName</key>
+    <string>${configName}</string>
+    <key>PayloadDescription</key>
+    <string>${configDescription}</string>
+    <key>PayloadOrganization</key>
+    <string>GitHub/Henrik404</string>
+  </dict>
+</plist>`;
+
+          // Create download link
+          const blob = new Blob([mobileConfig], { type: 'application/x-apple-aspen-config' });
+          downloadLink.href = URL.createObjectURL(blob);
+          downloadLink.download = `${configName}.mobileconfig`;
+          downloadLink.classList.remove('hidden');
+          generateBtn.classList.add('hidden');
+          progressBar.style.width = '100%';
+        })
+        .catch(error => {
+          console.error("File reading error:", error);
+          alert("Error reading files. Please try again.");
+        });
+    }
+
+    // PWA: Register Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(registration => {
+            console.log('Service Worker registration successful, scope:', registration.scope);
+          })
+          .catch(error => {
+            console.log('Service Worker registration failed:', error);
+          });
+      });
+    }
+  </script>
+</body>
+</html>
